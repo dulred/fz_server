@@ -2,3 +2,5 @@ build
 tmp
 data/*.aac
 data/*.h264
+log/*.log
+tmp/*.cpp

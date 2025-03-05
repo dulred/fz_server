@@ -7,8 +7,11 @@
 #include "src/handler/protocol_factory.h"
 #include <string>
 #include "src/utility/ini_file/IniFile.h"
+#include "src/utility/logger/Logger.h"
+#include "src/session/sessionManager.h"
 
 using namespace fz::epollServer;
+using namespace fz::utility;
 
 EpollServer::EpollServer()
     : port_(8554)
@@ -16,54 +19,6 @@ EpollServer::EpollServer()
 
 int EpollServer::init()
 {
-    // read default conifg.ini
-	IniFile inifile;
-    inifile.load("conf/config.ini");
-
-    port_  = inifile.get("server", "port");
-
-
-
-//     #include <iostream>
-// #include "utility/Logger.h"
-
-// using namespace std;
-// using namespace fz::utility;
-
-// int main(int argc, char const *argv[])
-// {
-//     g_logger.setFilename("./test.log");
-//     g_logger.max(10000);
-//     g_logger.open("./test.log");
-//     debug("areyou1");
-//     debug("areyou2");
-//     debug("areyou3");
-//     debug("areyou4");
-//     debug("areyou5");
-
-//     return 0;
-// }
-
-//     SessionManager manager;
-
-//     // 客户端 A 连接
-//     std::string sessionIdA = manager.createSession(1, "192.168.1.101", 5000, 5001);
-//     Session* sessionA = manager.getSession(sessionIdA);
-//     sessionA->state = "PLAY";
-//     sessionA->print();
-
-//     // 客户端 B 连接
-//     std::string sessionIdB = manager.createSession(2, "192.168.1.102", 5000, 5001);
-//     Session* sessionB = manager.getSession(sessionIdB);
-//     sessionB->state = "SETUP";
-//     sessionB->print();
-
-//     // 打印所有会话
-//     manager.printAllSessions();
-
-//     // 删除会话
-//     manager.deleteSession(sessionIdA);
-//     manager.printAllSessions();
 
         // 用于监听的 socket
         serverFd_ = initserver();
@@ -168,7 +123,7 @@ int EpollServer::init()
                 else
                 {
                     // my business logic is doclient function
-                    handleClientRequest(ev,i);
+                    handleClientRequest(events[i].data.fd);
                 }
             }
         }
@@ -177,8 +132,19 @@ int EpollServer::init()
 }
 void EpollServer::run() {
 
-    aac_handler = ProtocolFactory::createHandler("RTSP");
+    // read default conifg.ini
+	IniFile inifile;
+    inifile.load("conf/config.ini");
 
+    port_  = inifile.get("server", "port");
+
+    // logger ini
+    Logger* log = Singleton<Logger>::instance();
+    log->setFilename("log/test.log");
+    log->max(10000);
+    log->open("log/test.log");
+
+    // server init
     if (init() == -1)
     {
         printf("initServer is wrong \n");
@@ -187,10 +153,12 @@ void EpollServer::run() {
     
 }
 
-int EpollServer::handleClientRequest(struct epoll_event& ev, int i)
+int EpollServer::handleClientRequest(int clientFd)
 {
-    
-    int res =  aac_handler->handleRequest(epollFd_, ev, events,  i);
+    // to do objectPool
+    std::unique_ptr<ProtocolHandler> aac_handler = ProtocolFactory::createHandler("RTSP");
+
+    int res =  aac_handler->handleRequest(epollFd_,clientFd);
 
     if (res == -1)
     {

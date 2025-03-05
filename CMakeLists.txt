@@ -5,7 +5,8 @@ set(CMAKE_BUILD_TYPE Debug)
 
 include_directories(.)
 
-file(GLOB_RECURSE SOURCES "src/server/*.cpp" "src/handler/*.cpp" "src/utility/ini_file/*.cpp")
+file(GLOB_RECURSE SOURCES "src/server/*.cpp" "src/handler/*.cpp" 
+"src/utility/*.cpp" "src/session/*.cpp")
 
 # add_executable(test_process ${SOURCES} tests/test_process.cpp)
 
@@ -19,6 +20,9 @@ file(GLOB_RECURSE SOURCES "src/server/*.cpp" "src/handler/*.cpp" "src/utility/in
 # add_executable(select_udp_server tests/select_udp_server.cpp)
 # add_executable(rtsp_server src/rtsp/rtsp_server.cpp src/rtsp/rtp/rtp.cpp)
 add_executable(main ${SOURCES} main.cpp)
+add_executable(tmp tmp/test.cpp)
 
+target_link_libraries(tmp pthread)
+target_link_libraries(main pthread)
 # target_link_libraries(rtsp_server pthread)
 # target_link_libraries(test_thread pthread)

@@ -17,6 +17,7 @@ namespace fz
         #define BUFFER_SIZE 650000
         #define SERVER_RTP_PORT 55532
         #define SERVER_RTCP_PORT 55533
+        #define AAC_FILE_NAME "data/output.aac"
     } // namespace fz
     
 } // namespace fz

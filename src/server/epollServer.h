@@ -20,7 +20,7 @@ namespace fz
     {
 	class EpollServer {
 
-        SINGLETON(EpollServer);
+        SINGLETON(EpollServer)
 
     private:
         EpollServer();
@@ -31,14 +31,13 @@ namespace fz
     private:
         int initserver();
         int init();
-        int handleClientRequest(struct epoll_event& ev, int i);
+        int handleClientRequest(int clientFd);
     private:
         // 用于存放有事件发生的数组
         struct epoll_event events[MAXEVENTS];
         int port_;
         int serverFd_;
         int epollFd_;
-        std::unique_ptr<ProtocolHandler> aac_handler;
 };        
     } // namespace 
     

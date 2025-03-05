@@ -1,39 +1,38 @@
 #pragma once
 #include <string>
 #include <fstream>
-#include "singleton.h"
 #include <queue>
 #include <thread>
 #include <condition_variable>
 #include <atomic>
 #include <mutex>
-
+#include "src/common/singleton.h"
 using namespace std;
+using namespace fz::common;
 
-#define g_logger fz::Singleton<fz::utility::Logger>::instance()
 
 namespace fz {
     namespace utility{
 
 #define debug(format, ...) \
-    g_logger.log(Logger::DEBUG, __FILE__, __LINE__, format, ##__VA_ARGS__);
+    Singleton<fz::utility::Logger>::instance()->log(Logger::DEBUG, __FILE__, __LINE__, format, ##__VA_ARGS__);
 
 #define info(format, ...) \
-    g_logger.log(Logger::INFO, __FILE__, __LINE__, format, ##__VA_ARGS__);
+    Singleton<fz::utility::Logger>::instance()->log(Logger::INFO, __FILE__, __LINE__, format, ##__VA_ARGS__);
 
 #define warn(format, ...) \
-    g_logger.log(Logger::WARN, __FILE__, __LINE__, format, ##__VA_ARGS__);
+    Singleton<fz::utility::Logger>::instance()->log(Logger::WARN, __FILE__, __LINE__, format, ##__VA_ARGS__);
 
 #define error(format, ...) \
-    g_logger.log(Logger::ERROR, __FILE__, __LINE__, format, ##__VA_ARGS__);
+    Singleton<fz::utility::Logger>::instance()->log(Logger::ERROR, __FILE__, __LINE__, format, ##__VA_ARGS__);
 
 #define fatal(format, ...) \
-    g_logger.log(Logger::FATAL, __FILE__, __LINE__, format, ##__VA_ARGS__);
+    Singleton<fz::utility::Logger>::instance()->log(Logger::FATAL, __FILE__, __LINE__, format, ##__VA_ARGS__);
 
         class Logger
         {
+            SINGLETON(Logger)
         public:
-            friend Singleton<Logger>;
             enum Level
             {
                 DEBUG = 0,

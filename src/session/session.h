@@ -1,33 +1,107 @@
+#ifndef SESSION_H
+#define SESSION_H
+
 #include <iostream>
 #include <string>
 #include <unordered_map>
-
+#include "src/common/common.h"
 class Session {
+
 public:
-    std::string sessionId;          // 会话 ID
-    int clientFd;                  // 客户端文件描述符
-    std::string clientIp;          // 客户端 IP
-    int clientRtpPort;             // 客户端 RTP 端口
-    int clientRtcpPort;            // 客户端 RTCP 端口
-    int serverRtpPort;             // 服务器 RTP 端口
-    int serverRtcpPort;            // 服务器 RTCP 端口
-    std::string state;             // 会话状态（SETUP/PLAY/TEARDOWN）
+    Session() = default;
+    Session(int clientFd, std::string clientIp,
+         int clientRtpPort, int clientRtcpPort, int serverRtpPort, 
+         int serverRtcpPort, SessionStaus state,
+         int serverRtpSockfd, 
+         int serverRtcpSockfd)
+    {
+        clientFd_ = clientFd;
+        clientIp_ = clientIp;
+        clientRtpPort_ = clientRtpPort;
+        clientRtcpPort_ = clientRtcpPort;
+        serverRtpPort_ = serverRtpPort;
+        serverRtcpPort_ = serverRtcpPort;
+        state = SessionStaus::NONE;
+        serverRtpSockfd_ = serverRtpSockfd;
+        serverRtcpSockfd_ = serverRtcpSockfd;
+    };
+    ~Session() = default;
 
-    Session(std::string id, int fd, std::string ip, int rtpPort, int rtcpPort)
-        : sessionId(id), clientFd(fd), clientIp(ip), clientRtpPort(rtpPort), clientRtcpPort(rtcpPort), state("INIT") {
-        // 初始化服务器端口（假设随机分配）
-        serverRtpPort = 6000;  // 实际应用中需要动态分配
-        serverRtcpPort = 6001; // 实际应用中需要动态分配
-    }
-
+public:
     void print() {
-        std::cout << "Session ID: " << sessionId << "\n"
-                  << "Client FD: " << clientFd << "\n"
-                  << "Client IP: " << clientIp << "\n"
-                  << "Client RTP Port: " << clientRtpPort << "\n"
-                  << "Client RTCP Port: " << clientRtcpPort << "\n"
-                  << "Server RTP Port: " << serverRtpPort << "\n"
-                  << "Server RTCP Port: " << serverRtcpPort << "\n"
-                  << "State: " << state << "\n";
-    }
+        std::cout << "Client FD: " << clientFd_ << "\n"
+                  << "Client IP: " << clientIp_ << "\n"
+                  << "Client RTP Port: " << clientRtpPort_ << "\n"
+                  << "Client RTCP Port: " << clientRtcpPort_ << "\n"
+                  << "Server RTP Port: " << serverRtpPort_ << "\n"
+                  << "Server RTCP Port: " << serverRtcpPort_ << "\n"
+                  << "State: " << (int)state_ << "\n"
+                  << "Server RTP sockfd: " << serverRtpSockfd_ << "\n"
+                  << "Server RTCP sockfd: " << serverRtcpSockfd_ << "\n";
+                };
+
+    SessionStaus getState()
+    {
+        return state_;
+    };
+    int getServerRtpPort()
+    {
+        return serverRtpPort_ ;
+    };
+    int getServerRtcpPort()
+    {
+        return serverRtcpPort_;
+    };
+
+    int getServerRtpSockfd()
+    {
+        return serverRtpSockfd_;
+    };
+    int getServerRtcpSockfd()
+    {
+        return serverRtcpSockfd_;
+    };
+
+    void setClientFd(int clientFd)
+    {
+        clientFd_ = clientFd;
+    };
+    void setClientIp(std::string clientIp)
+    {
+        clientIp_ = clientIp;
+    };
+    void setClientRtpPort(int clientRtpPort)
+    {
+        clientRtpPort_ = clientRtpPort;
+    };
+    void setClientRtcpPort(int clientRtcpPort)
+    {
+        clientRtcpPort_ = clientRtcpPort;
+    };
+    void setServerRtpPort(int serverRtpPort)
+    {
+        serverRtpPort_ = serverRtpPort;
+    };
+    void setServerRtcpPort(int serverRtcpPort)
+    {
+        serverRtcpPort_ = serverRtcpPort;
+    };
+    void setState(SessionStaus state)
+    {
+        state_ = state;
+    };
+private:
+    int clientFd_;                  // 客户端文件描述符
+    std::string clientIp_;          // 客户端 IP
+    int clientRtpPort_;             // 客户端 RTP 端口
+    int clientRtcpPort_;            // 客户端 RTCP 端口
+    int serverRtpPort_;             // 服务器 RTP 端口
+    int serverRtcpPort_;            // 服务器 RTCP 端口
+    SessionStaus state_;             // 会话状态（SETUP/PLAY/TEARDOWN）
+    int serverRtpSockfd_;
+    int serverRtcpSockfd_;
+
+ 
 };
+
+#endif

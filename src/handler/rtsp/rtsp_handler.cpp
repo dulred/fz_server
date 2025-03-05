@@ -3,81 +3,117 @@
 #include <arpa/inet.h>
 #include "src/common/RtspConstants.h"
 #include "src/handler/rtsp/RtspResponse.h"
+#include "src/utility/generate_session.h"
+#include "src/utility/time.h"
+
 
 using namespace fz::common;
 
-int RtspHandler::handleRequest(int epollfd, struct epoll_event& ev, struct epoll_event events[], int i) {
+int print_peer_address(int sockfd,char* ip, int* port)
+{
+    struct sockaddr_in addr;
+    socklen_t addr_len = sizeof(addr);
+
+    memset(&addr, 0, sizeof(addr));
+
+    if (getpeername(sockfd, (struct sockaddr*)&addr, &addr_len) == 0)
+    {
+        *port = ntohs(addr.sin_port);
+        strcpy(ip, inet_ntoa(addr.sin_addr));
+        printf("peer IP: %s, Port: %d \n",ip,*port);
+        return 0;
+    }
+    else
+    {
+        perror("getpeername \n");
+        return  -1;
+    }
     
+}
+
+int RtspHandler::handleRequest(int epollfd, int clientFd) {
+
     epollfd_ = epollfd;
-    events_ = events;
-    index_ = i;
+    clientFd_ = clientFd;
+    print_peer_address(clientFd_,clientIp_,&clientPort_);
+
     // 客户端有数据过来或客户端的socket连接被断开。
     char buffer[BUF_MAX_SIZE];
     memset(buffer, 0, sizeof(buffer));
-
     int isize = 0;
-
     // recv client message
-    if (recv_message(ev,isize, buffer) == -1)
+    if (recv_message(isize, buffer) == -1)
     {
         printf("recv_message error \n");
         return -1;
     }
-        
     // parse and send rtsp protocol
     if (interact_rtsp(isize, buffer) == -1)
     {
         printf("interrat_rtsp_error \n");
         return -1;
     }
-    
+
     // excute play pause teardown request
-    switch (SessionStaus::NONE)
+    if (!session_.empty())
     {
-        case SessionStaus::PLAYING:
-            if (sendAacOverUdp() == -1)
-            {
-                printf("sendAacOverUdp error \n");
-                return -1;
-            }
-            break;
-        case SessionStaus::PAUSE:
-            if (pause_send() == -1)
-            {
-                printf("pause_send error \n");
-                return -1;
-            }
-            break;
-        case SessionStaus::TEARDOWN:
-            if (teardown_send() == -1)
-            {
-                printf("teardown_send error \n");
-                return -1;
-            }
-            break;
-        default:
-            break;
+        Session* ss = sessionManager_->getSession(session_);
+        switch (ss->getState())
+        {
+            case SessionStaus::PLAYING:
+                if (sendAacOverUdp() == -1)
+                {
+                    printf("sendAacOverUdp error \n");
+                    return -1;
+                }
+                // to change
+                ss->print();
+                portManager_->releasePorts(ss->getServerRtpPort(), ss->getServerRtcpPort());
+                close(ss->getServerRtpSockfd());
+                close(ss->getServerRtcpSockfd());
+                
+                break;
+            case SessionStaus::PAUSE:
+                if (pause_send() == -1)
+                {
+                    printf("pause_send error \n");
+                    return -1;
+                }
+                break;
+            case SessionStaus::TEARDOWN:
+                if (teardown_send() == -1)
+                {
+                    printf("teardown_send error \n");
+                    return -1;
+                }
+                break;
+            default:
+                break;
+        }
     }
+    
+   
 
     return 0;
 }
 
-int RtspHandler::recv_message(struct epoll_event& ev, int& isize, char* buffer)
+int RtspHandler::recv_message(int& isize, char* buffer)
 {
+    struct epoll_event ev;
 
     // 读取客户端的数据。
-    isize = recv(events_[index_].data.fd, buffer, BUF_MAX_SIZE ,0);
+    isize = recv(clientFd_, buffer, BUF_MAX_SIZE ,0);
     // 发生了错误或socket被对方关闭。
     if (isize <= 0)
     {
-        printf("client(eventfd=%d) disconnected.\n", events_[index_].data.fd);
+        printf("client(eventfd=%d) disconnected.\n", clientFd_);
         
         memset(&ev, 0, sizeof(struct epoll_event));
-        ev.data.fd = events_[index_].data.fd;
+        ev.data.fd = clientFd_;
         ev.events = EPOLLIN;
         // 从 epollfd 实例中移除对该 fd 的事件监视
-        epoll_ctl(epollfd_, EPOLL_CTL_DEL, events_[index_].data.fd, &ev);
-        close(events_[index_].data.fd);
+        epoll_ctl(epollfd_, EPOLL_CTL_DEL, clientFd_, &ev);
+        close(clientFd_);
         return -1;
     }
 }
@@ -96,7 +132,7 @@ int RtspHandler::interact_rtsp(const int& isize, char* buffer)
     int serverRtpSockfd = -1, serverRtcpSockfd = -1;
     const char* delimiter = "\n";
     char* line  = strtok(buffer, delimiter);
-    
+    char recv_session[40];
     while (line)
     {
         if (strstr(line, "OPTIONS") ||
@@ -129,16 +165,26 @@ int RtspHandler::interact_rtsp(const int& isize, char* buffer)
                 printf("parse Transport error \n");
             }
         }
+        else if (strstr(line, "Session"))
+        {
+            if (sscanf(line, "Session: %s\r\n", recv_session) != 1)
+            {
+                // error
+            }
+            session_ = recv_session;
+        }
 
         line = strtok(NULL,delimiter);
-        
+
     }
     char* sBuf = (char*)malloc(BUF_MAX_SIZE);
 
     // build response string  and store message in seesion
-    if (build_string(method, sBuf, CSeq, url, 
+    int res = build_string(method, sBuf, CSeq, url, 
         clientRtpPort, clientRtcpPort, serverRtpSockfd,
-        serverRtcpSockfd) == -1)
+        serverRtcpSockfd);
+
+    if (res == -1)
     {
         std::string serverError = generateRtspResponse(
             RtspStatusCode::InternalServerError,
@@ -149,10 +195,8 @@ int RtspHandler::interact_rtsp(const int& isize, char* buffer)
         // build error message
         printf("send error: %s \n",serverError.c_str());
         // send 500 
-        send(events_[index_].data.fd, serverError.c_str(), serverError.length(),0);
-    }else if (build_string(method, sBuf, CSeq, url, 
-        clientRtpPort, clientRtcpPort, serverRtpSockfd,
-        serverRtcpSockfd) == -2)
+        send(clientFd_, serverError.c_str(), serverError.length(),0);
+    }else if (res == -2)
     {
         std::string serverError = generateRtspResponse(
             RtspStatusCode::NotImplemented,
@@ -160,24 +204,22 @@ int RtspHandler::interact_rtsp(const int& isize, char* buffer)
             "Server: MyRtspServer/1.0\r\n",
             "notImplemented error."
         );
+
+        error("notImplemented error");
+        
         // build error message
         printf("send error: %s \n",serverError.c_str());
         // send 501 
-        send(events_[index_].data.fd, serverError.c_str(), serverError.length(),0);
+        send(clientFd_, serverError.c_str(), serverError.length(),0);
     }
     else 
     {
         printf("send success: %s \n",sBuf);
-
-        send(events_[index_].data.fd, sBuf, strlen(sBuf),0);
-    
+        send(clientFd_, sBuf, strlen(sBuf),0);
     }
-    
 
     return 0;
 }
-
-
 
 int createUdpSocket()
 {
@@ -217,7 +259,7 @@ int bindSocketAddr(int sockfd, const char* ip, int port)
     
 }
 
-int handleCmd_OPTIONS(char* result, int CSeq)
+int RtspHandler::handleCmd_OPTIONS(char* result, int CSeq)
 {
     sprintf(result,"RTSP/1.0 200 OK \r\n"
         "CSeq: %d\r\n"
@@ -229,7 +271,7 @@ int handleCmd_OPTIONS(char* result, int CSeq)
     return 0;
 }
 
-int handleCmd_DESCRIBE(char* result, int CSeq, char* url)
+int RtspHandler::handleCmd_DESCRIBE(char* result, int CSeq, char* url)
 {
     char sdp[500];
     char localIp[100];
@@ -239,8 +281,9 @@ int handleCmd_DESCRIBE(char* result, int CSeq, char* url)
         "o=- 9%ld 1 IN IP4 %s\r\n"
         "t=0 0\r\n"
         "a=control:*\r\n"
-        "m=video 0 RTP/AVP 96\r\n"
-        "a=rtpmap:96 H264/90000\r\n"
+        "m=audio 0 RTP/AVP 97\r\n"
+        "a=rtpmap:97 mpeg4-generic/44100/2\r\n"
+        "fmtp:97 profile-level-id=1;mode=AAC-hbr;sizelength=13;indexlength=3;indexdeltalength=3;config=1210;\r\n",
         "a=control:track0\r\n",
         time(0),localIp);
     
@@ -259,49 +302,54 @@ int handleCmd_DESCRIBE(char* result, int CSeq, char* url)
     return 0;
 }
 
-int handleCmd_SETUP(char* result, int CSeq, int clientRtpPort, int clientRtcpPort)
+int RtspHandler::handleCmd_SETUP(char* result, int CSeq, 
+    int clientRtpPort, int clientRtcpPort, int serverRtpPort, int serverRtcpPort)
 {
     sprintf(result,"RTSP/1.0 200 OK \r\n"
         "CSeq: %d\r\n"
         "Transport: RTP/AVP;unicast;client_port=%d-%d;server_port=%d-%d\r\n"
-        "Session: 66334873\r\n"
+        "Session: %s\r\n"
         "\r\n",
         CSeq,
         clientRtpPort,
         clientRtcpPort,
-        SERVER_RTP_PORT,
-        SERVER_RTCP_PORT
+        serverRtpPort,
+        serverRtcpPort,
+        session_.c_str()
     );
     
     return 0;
 }
 
-int handleCmd_PLAY(char* result, int CSeq)
+int RtspHandler::handleCmd_PLAY(char* result, int CSeq)
 {
     sprintf(result,"RTSP/1.0 200 OK \r\n"
         "CSeq: %d\r\n"
         "Range: npt=0.000-\r\n"
-        "Session: 66334873; timeout=10\r\n"
+        "Session: %s; timeout=10\r\n"
         "\r\n",
-        CSeq
+        CSeq,
+        session_.c_str()
     );
     
     return 0;
 }
 
-int handleCmd_PAUSE(char* result, int CSeq)
+int RtspHandler::handleCmd_PAUSE(char* result, int CSeq)
 {
+    
     sprintf(result,"RTSP/1.0 200 OK \r\n"
         "CSeq: %d\r\n"
-        "Date: 23 Jan 1997 15:35:06 GMT\r\n"
+        "Date: %s\r\n"
         "\r\n",
-        CSeq
+        CSeq,
+        getGmtTime().c_str()
     );
     
     return 0;
 }
 
-int handleCmd_TEARDOWN(char* result, int CSeq)
+int RtspHandler::handleCmd_TEARDOWN(char* result, int CSeq)
 {
     sprintf(result,"RTSP/1.0 200 OK \r\n"
         "CSeq: %d\r\n"
@@ -316,16 +364,15 @@ int RtspHandler::build_string(char* method, char* sBuf, int CSeq, char* url,
                 int clientRtpPort, int clientRtcpPort, int serverRtpSockfd
                 , int serverRtcpSockfd)
 {
-    // if (!strcmp(method, "OPTIONS"))
-    // {
-    //     if (handleCmd_OPTIONS(sBuf, CSeq))
-    //     {
-    //         printf("handleCmd_OPTIONS is wrong");
-    //         return -1;
-    //     }
-        
-    // }
-    // else 
+    if (!strcmp(method, "OPTIONS"))
+    {
+        if (handleCmd_OPTIONS(sBuf, CSeq))
+        {
+            printf("handleCmd_OPTIONS is wrong");
+            return -1;
+        }   
+    } 
+    else 
     if(!strcmp(method, "DESCRIBE"))
     {
         if (handleCmd_DESCRIBE(sBuf, CSeq, url))
@@ -336,12 +383,17 @@ int RtspHandler::build_string(char* method, char* sBuf, int CSeq, char* url,
     } 
     else if(!strcmp(method, "SETUP"))
     {
-        if (handleCmd_SETUP(sBuf, CSeq, clientRtpPort, clientRtcpPort))
+        // generate sessionId
+        session_ = generateSessionId();
+        
+        auto ports = portManager_->generatePorts(); // 返回 pair
+        std::cout << "RTP Port: " << ports.first << ", RTCP Port: " << ports.second << std::endl;
+
+        if (handleCmd_SETUP(sBuf, CSeq, clientRtpPort, clientRtcpPort, ports.first ,ports.second))
         {
             printf("handleCmd_SETUP is wrong");
             return -1;
         }
-
 
         serverRtpSockfd = createUdpSocket();
         serverRtcpSockfd = createUdpSocket();
@@ -351,12 +403,18 @@ int RtspHandler::build_string(char* method, char* sBuf, int CSeq, char* url,
             return -1;
         }
         
-       if ((bindSocketAddr(serverRtpSockfd,"0.0.0.0",SERVER_RTP_PORT) == -1) 
-       || (bindSocketAddr(serverRtcpSockfd,"0.0.0.0",SERVER_RTCP_PORT) == -1))
+       if ((bindSocketAddr(serverRtpSockfd,"0.0.0.0",ports.first) == -1) 
+       || (bindSocketAddr(serverRtcpSockfd,"0.0.0.0",ports.second ) == -1))
        {
             printf("bind udp socket faild");
             return -1;
        }
+
+       // if no any error ,create session
+       Session* sess = new Session(clientFd_, clientIp_, 
+        clientRtpPort, clientRtcpPort, ports.first, ports.second,
+         SessionStaus::NONE ,serverRtpSockfd, serverRtcpSockfd);
+       sessionManager_->addSession(session_, sess);
 
     }
     else if(!strcmp(method, "PLAY"))
@@ -367,6 +425,10 @@ int RtspHandler::build_string(char* method, char* sBuf, int CSeq, char* url,
             printf("handleCmd_PLAY is wrong");
             return -1;
         }
+        // printf("--------------------- now play--------------");
+
+        Session* ss = sessionManager_->getSession(session_);
+        ss->setState(SessionStaus::PLAYING);
     }
     else if(!strcmp(method, "PAUSE"))
     {
@@ -396,9 +458,36 @@ int RtspHandler::build_string(char* method, char* sBuf, int CSeq, char* url,
 }
 
 
-
 int RtspHandler::sendAacOverUdp()
 {
+    // extract aac data
+    FILE* fp  = fopen(AAC_FILE_NAME, "rb");
+    if (!fp)
+    {
+        printf("open file error, %s", AAC_FILE_NAME);
+        error("open file error, %s", AAC_FILE_NAME);
+        return -1;
+    }
+    int rSize = 0;
+    char* frame = (char*)malloc(BUFFER_SIZE);
+    while (true)
+    {
+        rSize = fread(frame, 1, 7, fp);
+        if (rSize <= 0)
+        {
+            printf("read error \n");
+            break;
+        }
+
+        // extract_aac();
+        printf("-----------sendAacOverUdp---------- \n");
+        // packing into the rtpPacket
+        // packRtpAndSend();
+    }
+
+
+    fclose(fp);
+    free(frame);
 
     return 0;
 }

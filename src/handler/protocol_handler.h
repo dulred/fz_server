@@ -4,7 +4,7 @@
 class ProtocolHandler {
     public:
         virtual ~ProtocolHandler() = default;
-        virtual int handleRequest(int epollfd, struct epoll_event& ev, struct epoll_event events[], int i) = 0;
+        virtual int handleRequest(int epollfd, int clientFd) = 0;
 };
 
 #endif

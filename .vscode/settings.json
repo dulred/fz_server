@@ -42,6 +42,15 @@
         "streambuf": "cpp",
         "thread": "cpp",
         "typeinfo": "cpp",
-        "iostream": "cpp"
+        "iostream": "cpp",
+        "condition_variable": "cpp",
+        "map": "cpp",
+        "mutex": "cpp",
+        "functional": "cpp",
+        "iterator": "cpp",
+        "numeric": "cpp",
+        "random": "cpp",
+        "iomanip": "cpp",
+        "unordered_set": "cpp"
     }
 }

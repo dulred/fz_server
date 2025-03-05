@@ -1,12 +1,25 @@
+#ifndef SESSION_MANAGER_H
+#define SESSION_MANAGER_H
+
+#include <unordered_map>
+#include "src/session/session.h"
+
+#include "src/common/singleton.h"
+using namespace std;
+using namespace fz::common;
+
+
 class SessionManager {
+
+    SINGLETON(SessionManager)
+
 private:
     std::unordered_map<std::string, Session*> sessions; // 会话表
-
+    SessionManager(){};
+    ~SessionManager(){};
 public:
     // 创建新会话
-    std::string createSession(int clientFd, std::string clientIp, int rtpPort, int rtcpPort) {
-        std::string sessionId = "sess_" + std::to_string(sessions.size() + 1); // 生成唯一 Session ID
-        Session* session = new Session(sessionId, clientFd, clientIp, rtpPort, rtcpPort);
+    std::string addSession(std::string sessionId, Session* session) {
         sessions[sessionId] = session;
         return sessionId;
     }
@@ -34,3 +47,4 @@ public:
         }
     }
 };
+#endif
