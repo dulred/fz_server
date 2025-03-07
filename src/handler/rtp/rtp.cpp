@@ -2,7 +2,7 @@
 // #include <WinSock2.h>
 // #include <WS2tcpip.h>
 // #include <windows.h>
-#include "rtp.h"
+#include "src/handler/rtp/rtp.h"
 #include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -23,7 +23,7 @@ void rtpHeaderInit(struct RtpPacket* rtpPacket, uint8_t csrcLen, uint8_t extensi
     rtpPacket->rtpHeader.timestamp = timestamp;
     rtpPacket->rtpHeader.ssrc = ssrc;
 }
-int rtpSendPacketOverTcp(int clientSockfd, struct RtpPacket* rtpPacket, uint32_t dataSize)
+int rtpSendPacketOverTcp(int clientSockfd, struct RtpPacket* rtpPacket, uint32_t dataSize,char channel)
 {
 
     rtpPacket->rtpHeader.seq = htons(rtpPacket->rtpHeader.seq);
@@ -33,7 +33,7 @@ int rtpSendPacketOverTcp(int clientSockfd, struct RtpPacket* rtpPacket, uint32_t
     uint32_t rtpSize = RTP_HEADER_SIZE + dataSize;
     char* tempBuf = (char*)malloc(4 + rtpSize);
     tempBuf[0] = 0x24;//$
-    tempBuf[1] = 0x00;
+    tempBuf[1] = channel;
     tempBuf[2] = (uint8_t)(((rtpSize) & 0xFF00) >> 8);
     tempBuf[3] = (uint8_t)((rtpSize) & 0xFF);
     memcpy(tempBuf + 4, (char*)rtpPacket, rtpSize);

@@ -1,21 +1,36 @@
 #include <stdio.h>
 #include <thread>
-#include <chrono>
-//  linux need to link pthread lib ,otherwise fail
-int main(int argc, char const *argv[])
-{
-    std::thread t ([](){
-        printf("are you ok?");
-        std::this_thread::sleep_for(std::chrono::seconds(2));
-    });
+#include <vector>
+#include <atomic>
+#include <iostream>
 
-    // t.join();
-    // t.detach();
-    if (t.joinable())
+
+std::atomic<int> counter(0);
+
+void increment ()
+{
+
+    for (size_t i = 0; i < 10000; i++)
     {
-        t.join();
+        counter++;
     }
     
-    printf("done");
+}
+
+int main(int argc, char const *argv[])
+{
+    std::vector<std::thread> vecs;
+    for (int i = 0; i < 10; i++)
+    {
+        vecs.emplace_back(increment);
+    }
+    
+    for (auto &i : vecs)
+    {
+        i.join();
+    }
+    
+    std::cout << counter << std::endl;
+
     return 0;
 }

@@ -11,6 +11,7 @@
 #include "src/utility/logger/Logger.h"
 #include "src/utility/portManager.h"
 #include "src/session/sessionManager.h"
+#include <src/common/clientFdManager.h>
 
 using namespace fz::utility;
 
@@ -20,16 +21,29 @@ class RtspHandler : public ProtocolHandler {
         RtspHandler(){
             portManager_ = Singleton<PortManager>::instance();
             sessionManager_ = Singleton<SessionManager>::instance();
+            clientFdManager_ = Singleton<ClientFdManager>::instance();
         };
         ~RtspHandler() = default;
     public:
-    // handler request
+    // handler request udp
     int handleRequest(int epollfd, int clientFd) override;
     int recv_message(int& size, char* buffer);
     int interact_rtsp(const int& isize, char* buffer);
     int sendAacOverUdp();
+    int sendH264OverUdp();
+    int sendH264AacOverUdp();
     int pause_send();
     int teardown_send();
+
+// tcp
+    int handleCmd_DESCRIBE_TCP(char* result, int CSeq, char* url);
+    int handleCmd_SETUP_TCP(char* result, int CSeq);
+    int build_string_tcp(char* method, char* sBuf, int CSeq, char* url);
+    int interact_rtsp_tcp(const int& isize, char* buffer);
+    int sendAacOverTcp();
+    int sendH264OverTcp();
+    int sendH264AacOverTcp();
+
     private:
         int build_string(char* method, char* sBuf, int CSeq, char* url,
             int clientRtpPort, int clientRtcpPort, int serverRtpSockfd
@@ -49,7 +63,7 @@ class RtspHandler : public ProtocolHandler {
         int clientPort_;
         PortManager* portManager_;
         SessionManager* sessionManager_;
-        
+        ClientFdManager* clientFdManager_;
     
 };
 

@@ -22,7 +22,7 @@ file(GLOB_RECURSE SOURCES "src/server/*.cpp" "src/handler/*.cpp"
 add_executable(main ${SOURCES} main.cpp)
 add_executable(tmp tmp/test.cpp)
 
-target_link_libraries(tmp pthread)
+# target_link_libraries(tmp pthread)
 target_link_libraries(main pthread)
 # target_link_libraries(rtsp_server pthread)
-# target_link_libraries(test_thread pthread)
+target_link_libraries(tmp pthread)

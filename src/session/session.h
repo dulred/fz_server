@@ -5,102 +5,103 @@
 #include <string>
 #include <unordered_map>
 #include "src/common/common.h"
+#include <unordered_map>
+
+
+struct rtsp_attr
+{
+    int clientRtpPort_;             // 客户端 RTP 端口
+    int clientRtcpPort_;            // 客户端 RTCP 端口
+    int serverRtpPort_;             // 服务器 RTP 端口
+    int serverRtcpPort_;            // 服务器 RTCP 端口
+    int serverRtpSockfd_;
+    int serverRtcpSockfd_;
+};
+
 class Session {
 
 public:
     Session() = default;
     Session(int clientFd, std::string clientIp,
-         int clientRtpPort, int clientRtcpPort, int serverRtpPort, 
-         int serverRtcpPort, SessionStaus state,
-         int serverRtpSockfd, 
-         int serverRtcpSockfd)
+          SessionStaus state)
     {
         clientFd_ = clientFd;
         clientIp_ = clientIp;
-        clientRtpPort_ = clientRtpPort;
-        clientRtcpPort_ = clientRtcpPort;
-        serverRtpPort_ = serverRtpPort;
-        serverRtcpPort_ = serverRtcpPort;
         state = SessionStaus::NONE;
-        serverRtpSockfd_ = serverRtpSockfd;
-        serverRtcpSockfd_ = serverRtcpSockfd;
     };
     ~Session() = default;
 
 public:
     void print() {
         std::cout << "Client FD: " << clientFd_ << "\n"
+        << "State: " << (int)state_ << "\n"
                   << "Client IP: " << clientIp_ << "\n"
-                  << "Client RTP Port: " << clientRtpPort_ << "\n"
-                  << "Client RTCP Port: " << clientRtcpPort_ << "\n"
-                  << "Server RTP Port: " << serverRtpPort_ << "\n"
-                  << "Server RTCP Port: " << serverRtcpPort_ << "\n"
-                  << "State: " << (int)state_ << "\n"
-                  << "Server RTP sockfd: " << serverRtpSockfd_ << "\n"
-                  << "Server RTCP sockfd: " << serverRtcpSockfd_ << "\n";
-                };
+                  << "video info: " << "\n"
+                  << "Client RTP Port: " << info["video"].clientRtpPort_ << "\n"
+                  << "Client RTCP Port: " << info["video"].clientRtcpPort_  << "\n"
+                  << "Server RTP Port: " << info["video"].serverRtpPort_  << "\n"
+                  << "Server RTCP Port: " << info["video"].serverRtcpPort_  << "\n"
+                  
+                  << "Server RTP sockfd: " << info["video"].serverRtpSockfd_ << "\n"
+                  << "Server RTCP sockfd: " << info["video"].serverRtcpSockfd_ << "\n"
+                  << "audio info: " << "\n"
+                  << "Client RTP Port: " << info["audio"].clientRtpPort_ << "\n"
+                  << "Client RTCP Port: " << info["audio"].clientRtcpPort_  << "\n"
+                  << "Server RTP Port: " << info["audio"].serverRtpPort_  << "\n"
+                  << "Server RTCP Port: " << info["audio"].serverRtcpPort_  << "\n"
+                  
+                  << "Server RTP sockfd: " << info["audio"].serverRtpSockfd_ << "\n"
+                  << "Server RTCP sockfd: " << info["audio"].serverRtcpSockfd_ << "\n";
+                }
 
     SessionStaus getState()
     {
         return state_;
-    };
-    int getServerRtpPort()
-    {
-        return serverRtpPort_ ;
-    };
-    int getServerRtcpPort()
-    {
-        return serverRtcpPort_;
-    };
-
-    int getServerRtpSockfd()
-    {
-        return serverRtpSockfd_;
-    };
-    int getServerRtcpSockfd()
-    {
-        return serverRtcpSockfd_;
-    };
-
+    }
     void setClientFd(int clientFd)
     {
         clientFd_ = clientFd;
-    };
+    }
     void setClientIp(std::string clientIp)
     {
         clientIp_ = clientIp;
-    };
-    void setClientRtpPort(int clientRtpPort)
-    {
-        clientRtpPort_ = clientRtpPort;
-    };
-    void setClientRtcpPort(int clientRtcpPort)
-    {
-        clientRtcpPort_ = clientRtcpPort;
-    };
-    void setServerRtpPort(int serverRtpPort)
-    {
-        serverRtpPort_ = serverRtpPort;
-    };
-    void setServerRtcpPort(int serverRtcpPort)
-    {
-        serverRtcpPort_ = serverRtcpPort;
-    };
+    }
     void setState(SessionStaus state)
     {
         state_ = state;
-    };
+    }
+
+    void setInfo(std::string str,struct rtsp_attr attr)
+    {
+        info[str] = attr;
+    }
+
+    int getServerAacRtpSockfd()
+    {
+        return info["audio"].serverRtpSockfd_;
+    }
+
+    int getServerH264RtpSockfd()
+    {
+        return info["video"].serverRtpSockfd_;
+    }
+
+    int getClientAacRtpPort()
+    {
+        return info["audio"].clientRtpPort_;
+    }
+
+    int getClientH264RtpPort()
+    {
+        return info["video"].clientRtpPort_;
+    }
+
+    
 private:
     int clientFd_;                  // 客户端文件描述符
     std::string clientIp_;          // 客户端 IP
-    int clientRtpPort_;             // 客户端 RTP 端口
-    int clientRtcpPort_;            // 客户端 RTCP 端口
-    int serverRtpPort_;             // 服务器 RTP 端口
-    int serverRtcpPort_;            // 服务器 RTCP 端口
     SessionStaus state_;             // 会话状态（SETUP/PLAY/TEARDOWN）
-    int serverRtpSockfd_;
-    int serverRtcpSockfd_;
-
+    std::unordered_map<std::string,struct rtsp_attr> info;
  
 };
 

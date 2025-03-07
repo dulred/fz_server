@@ -96,3 +96,37 @@ static int rtpSendAACFrame(int socket, const char* ip, int16_t port,
 
     return 0;
 }
+
+
+static int rtpSendAACFrameTcp(int socket,struct RtpPacket* rtpPacket, 
+    uint8_t* frame, uint32_t frameSize) {
+    //打包文档：https://blog.csdn.net/yangguoyu8023/article/details/106517251/
+    int ret;
+
+    rtpPacket->payload[0] = 0x00;
+    rtpPacket->payload[1] = 0x10;
+    rtpPacket->payload[2] = (frameSize & 0x1FE0) >> 5; //高8位
+    rtpPacket->payload[3] = (frameSize & 0x1F) << 3; //低5位
+
+    memcpy(rtpPacket->payload + 4, frame, frameSize);
+
+    ret = rtpSendPacketOverTcp(socket,rtpPacket, frameSize + 4, 0x02);
+    if (ret < 0)
+    {
+        printf("failed to send rtp packet\n");
+        return -1;
+    }
+
+    rtpPacket->rtpHeader.seq++;
+
+    /*
+     * 如果采样频率是44100
+     * 一般AAC每个1024个采样为一帧
+     * 所以一秒就有 44100 / 1024 = 43帧
+     * 时间增量就是 44100 / 43 = 1025
+     * 一帧的时间为 1 / 43 = 23ms
+     */
+    rtpPacket->rtpHeader.timestamp += 1025;
+
+    return 0;
+}
